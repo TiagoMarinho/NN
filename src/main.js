@@ -69,16 +69,16 @@ const schedulers = {
 	constant: (epoch, total, rate) => rate
 };
 
-const BITS = 64;
+const BITS = 8;
 const CONFIGURATION = {
 	BITS,
-	TASK: TASKS.majority(BITS),
-	HIDDEN_LAYERS: [64, 32, 16],
+	TASK: TASKS.parity(BITS),
+	HIDDEN_LAYERS: [16, 16, 8],
 	TOTAL_EPOCHS: 1000,
-	SAMPLES_PER_EPOCH: 1000,
+	SAMPLES_PER_EPOCH: 4000,
 	BATCH_SIZE: 1,
 	
-	SCHEDULER: (e, t) => schedulers.linear(e, t, 0.1, 0.01),
+	SCHEDULER: (e, t) => schedulers.linear(e, t, 0.001, 0.0005),
 
 	LOG_FREQUENCY: 10,
 };
@@ -103,7 +103,7 @@ const activations = {
 const losses = {
 	mae: {
 		calculate: (t, p) => Math.abs(t - p),
-		derivative: (t, p) => (t > p ? -1 : 1),
+		derivative: (t, p) => (t > p ? 1 : -1),
 	},
 
 	mse: {
@@ -213,18 +213,18 @@ class Layer {
 		return nextErrors;
 	}
 
-	update(learningRate) {
+	update(learningRate, batchSize) {
 		if (this.buffer.size === 0) return;
-		const step = learningRate / this.buffer.size;
-
+		const step = learningRate / batchSize;
+	  
 		for (let i = 0; i < this.weights.length; i++) {
-			this.weights[i] -= step * this.buffer.weightGradients[i];
+		  this.weights[i] -= step * this.buffer.weightGradients[i];
 		}
 		for (let i = 0; i < this.biases.length; i++) {
-			this.biases[i] -= step * this.buffer.biasGradients[i];
+		  this.biases[i] -= step * this.buffer.biasGradients[i];
 		}
 		this.buffer.reset();
-	}
+	  }
 }
 
 class NeuralNetwork {
@@ -255,8 +255,8 @@ class NeuralNetwork {
 		}
 	}
 
-	optimize(learningRate) {
-		this.layers.forEach((layer) => layer.update(learningRate));
+	optimize(learningRate, batchSize) {
+		this.layers.forEach((layer) => layer.update(learningRate, batchSize));
 	}
 }
 
@@ -278,7 +278,7 @@ function train(network) {
 		
 		const rate = SCHEDULER(epoch, TOTAL_EPOCHS);
 
-		for (let epoch = 1; epoch <= SAMPLES_PER_EPOCH; epoch++) {
+		for (let sample = 1; sample <= SAMPLES_PER_EPOCH; sample++) {
 			const { input, target } = TASK.generate();
 			const prediction = network.predict(input);
 
@@ -286,7 +286,7 @@ function train(network) {
 			mseAcc += losses.mse.calculate(target[0], prediction[0]);
 
 			network.backward(target);
-			if (epoch % BATCH_SIZE === 0) network.optimize(rate);
+			if (sample % BATCH_SIZE === 0) network.optimize(rate, BATCH_SIZE);
 		}
 
 		if (epoch % LOG_FREQUENCY === 0 || epoch === TOTAL_EPOCHS) {
