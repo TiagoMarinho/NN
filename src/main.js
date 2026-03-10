@@ -48,10 +48,10 @@ const TASKS = {
 	}),
 };
 
-const BITS = 16;
+const BITS = 8;
 const CONFIGURATION = {
 	BITS,
-	TASK: TASKS.xor(BITS),
+	TASK: TASKS.parity(BITS),
 	HIDDEN_LAYERS: [32, 16],
 	TOTAL_EPOCHS: 1000,
 	SAMPLES_PER_EPOCH: 1000,
@@ -84,86 +84,101 @@ const losses = {
 };
 
 class GradientBuffer {
-	constructor(outputSize, inputSize) {
-		this.weightGradients = Array.from({ length: outputSize }, () =>
-			Array(inputSize).fill(0),
-		);
-		this.biasGradients = Array(outputSize).fill(0);
-		this.size = 0;
-	}
+    constructor(outputSize, inputSize) {
+        this.outputSize = outputSize;
+        this.inputSize = inputSize;
+        this.weightGradients = new Float32Array(outputSize * inputSize);
+        this.biasGradients = new Float32Array(outputSize);
+        this.size = 0;
+    }
 
-	add(gradients, inputs) {
-		for (let i = 0; i < this.weightGradients.length; i++) {
-			for (let j = 0; j < this.weightGradients[i].length; j++) {
-				this.weightGradients[i][j] += gradients[i] * inputs[j];
-			}
-			this.biasGradients[i] += gradients[i];
-		}
-		this.size++;
-	}
+    add(deltas, inputs) {
+        for (let i = 0; i < this.outputSize; i++) {
+            const offset = i * this.inputSize;
+            const delta = deltas[i];
+            
+            for (let j = 0; j < this.inputSize; j++) {
+                this.weightGradients[offset + j] += delta * inputs[j];
+            }
+            this.biasGradients[i] += delta;
+        }
+        this.size++;
+    }
 
-	reset() {
-		this.weightGradients.forEach((row) => row.fill(0));
-		this.biasGradients.fill(0);
-		this.size = 0;
-	}
+    reset() {
+        this.weightGradients.fill(0);
+        this.biasGradients.fill(0);
+        this.size = 0;
+    }
 }
 
 class Layer {
-	constructor(inputSize, outputSize, activation) {
-		this.activation = activation;
-		const scale = getHeWeightScale(inputSize);
-		this.weights = Array.from({ length: outputSize }, () =>
-			Array.from(
-				{ length: inputSize },
-				() => getRandomFloat(-1, 1) * scale,
-			),
-		);
-		this.biases = Array(outputSize).fill(0.01);
-		this.buffer = new GradientBuffer(outputSize, inputSize);
-		this.inputCache = null;
-		this.outputCache = null;
-	}
+    constructor(inputSize, outputSize, activation) {
+        this.inputSize = inputSize;
+        this.outputSize = outputSize;
+        this.activation = activation;
+        
+        const scale = getHeWeightScale(inputSize);
+        this.weights = new Float32Array(outputSize * inputSize).map(() => 
+            getRandomFloat(-1, 1) * scale
+        );
+        this.biases = new Float32Array(outputSize).fill(0.01);
+        
+        this.buffer = new GradientBuffer(outputSize, inputSize);
+        this.inputCache = null;
+        this.outputCache = null;
+    }
 
-	forward(inputs) {
-		this.inputCache = inputs;
-		this.outputCache = this.weights.map((row, i) => {
-			const sum = row.reduce(
-				(acc, w, j) => acc + w * inputs[j],
-				this.biases[i],
-			);
-			return this.activation.calculate(sum);
-		});
-		return this.outputCache;
-	}
+    forward(inputs) {
+        this.inputCache = inputs;
+        const outputs = new Float32Array(this.outputSize);
 
-	backward(errors) {
-		const deltas = errors.map(
-			(err, i) => err * this.activation.derivative(this.outputCache[i]),
-		);
-		const nextErrors = Array(this.inputCache.length).fill(0);
+        for (let i = 0; i < this.outputSize; i++) {
+            const offset = i * this.inputSize;
+            let sum = this.biases[i];
+            
+            for (let j = 0; j < this.inputSize; j++) {
+                sum += this.weights[offset + j] * inputs[j];
+            }
+            outputs[i] = this.activation.calculate(sum);
+        }
+        
+        this.outputCache = outputs;
+        return outputs;
+    }
 
-		for (let i = 0; i < this.weights.length; i++) {
-			for (let j = 0; j < this.weights[i].length; j++) {
-				nextErrors[j] += this.weights[i][j] * deltas[i];
-			}
-		}
+    backward(errors) {
+        const deltas = new Float32Array(this.outputSize);
+        for (let i = 0; i < this.outputSize; i++) {
+            deltas[i] = errors[i] * this.activation.derivative(this.outputCache[i]);
+        }
 
-		this.buffer.add(deltas, this.inputCache);
-		return nextErrors;
-	}
+        const nextErrors = new Float32Array(this.inputSize).fill(0);
+        for (let i = 0; i < this.outputSize; i++) {
+            const offset = i * this.inputSize;
+            const delta = deltas[i];
+            
+            for (let j = 0; j < this.inputSize; j++) {
+                nextErrors[j] += this.weights[offset + j] * delta;
+            }
+        }
 
-	update(learningRate) {
-		if (this.buffer.size === 0) return;
-		const step = learningRate / this.buffer.size;
-		for (let i = 0; i < this.weights.length; i++) {
-			for (let j = 0; j < this.weights[i].length; j++) {
-				this.weights[i][j] += step * this.buffer.weightGradients[i][j];
-			}
-			this.biases[i] += step * this.buffer.biasGradients[i];
-		}
-		this.buffer.reset();
-	}
+        this.buffer.add(deltas, this.inputCache);
+        return nextErrors;
+    }
+
+    update(learningRate) {
+        if (this.buffer.size === 0) return;
+        const step = learningRate / this.buffer.size;
+
+        for (let i = 0; i < this.weights.length; i++) {
+            this.weights[i] += step * this.buffer.weightGradients[i];
+        }
+        for (let i = 0; i < this.biases.length; i++) {
+            this.biases[i] += step * this.buffer.biasGradients[i];
+        }
+        this.buffer.reset();
+    }
 }
 
 class NeuralNetwork {
