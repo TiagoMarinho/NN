@@ -273,17 +273,19 @@ function train(network) {
 	printHeader(`Training: ${TASK.name}`);
 
 	for (let epoch = 1; epoch <= TOTAL_EPOCHS; epoch++) {
-		let maeAcc = 0,
-			mseAcc = 0;
+		let maeAcc = 0;
+		let mseAcc = 0;
+		let bceAcc = 0;
 		
 		const rate = SCHEDULER(epoch, TOTAL_EPOCHS);
 
 		for (let sample = 1; sample <= SAMPLES_PER_EPOCH; sample++) {
 			const { input, target } = TASK.generate();
 			const prediction = network.predict(input);
-
+			
 			maeAcc += losses.mae.calculate(target[0], prediction[0]);
 			mseAcc += losses.mse.calculate(target[0], prediction[0]);
+			bceAcc += losses.bce.calculate(target[0], prediction[0]);
 
 			network.backward(target);
 			if (sample % BATCH_SIZE === 0) network.optimize(rate, BATCH_SIZE);
@@ -293,9 +295,10 @@ function train(network) {
 			const progress = epoch / TOTAL_EPOCHS;
 			console.log(
 				`${formatList("Epoch", epoch.toString().padStart(4), "cyan")} (${formatPercentage(progress, 0).padStart(4)}) | ` +
-					`${formatList("MAE", padTrailingZeros(maeAcc / SAMPLES_PER_EPOCH, 5), "yellow")} | ` +
-					`${formatList("MSE", padTrailingZeros(mseAcc / SAMPLES_PER_EPOCH, 5), "magenta")} | ` +
-					`${formatList("Rate", padTrailingZeros(rate, 4), "reset")}`,
+				`${formatList("MAE", padTrailingZeros(maeAcc / SAMPLES_PER_EPOCH, 10), "yellow")} | ` +
+				`${formatList("MSE", padTrailingZeros(mseAcc / SAMPLES_PER_EPOCH, 10), "magenta")} | ` +
+				`${formatList("BCE", padTrailingZeros(bceAcc / SAMPLES_PER_EPOCH, 10), "green")} | ` +
+				`${formatList("Rate", padTrailingZeros(rate, 4), "reset")}`,
 			);
 		}
 	}
