@@ -69,16 +69,16 @@ const schedulers = {
 	constant: (epoch, total, rate) => rate
 };
 
-const BITS = 8;
+const BITS = 16;
 const CONFIGURATION = {
 	BITS,
 	TASK: TASKS.parity(BITS),
-	HIDDEN_LAYERS: [16, 16, 8],
+	HIDDEN_LAYERS: [32, 16, 16],
 	TOTAL_EPOCHS: 1000,
 	SAMPLES_PER_EPOCH: 4000,
-	BATCH_SIZE: 1,
+	BATCH_SIZE: 16,
 	
-	SCHEDULER: (e, t) => schedulers.linear(e, t, 0.001, 0.0005),
+	SCHEDULER: (e, t) => schedulers.linear(e, t, 0.1, 0.01),
 
 	LOG_FREQUENCY: 10,
 };
