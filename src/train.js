@@ -3,6 +3,7 @@ import { printHeader, paint, formatStatus, formatList } from "./utils/log.js";
 import { padTrailingZeros, formatPercentage } from "./utils/formatting.js";
 
 const THRESHOLD = 0.5;
+const CERTAINTY_SCALE = 2;
 const MAX_SAMPLES = 32;
 const BASE_2 = 2;
 const PAD_CHAR = "0";
@@ -55,8 +56,14 @@ const verify = (network, task, inputString) => {
 	const discrete = Array.from(pred, (v) => (v > THRESHOLD ? 1 : 0));
 	const isCorrect = target.every((val, i) => val === discrete[i]);
 
+	const totalConfidence = pred.reduce((acc, val) => acc + Math.abs(val - THRESHOLD) * CERTAINTY_SCALE, 0);
+	const averageConfidence = totalConfidence / pred.length;
+
+	const certaintyLabel = paint(formatPercentage(averageConfidence, 1), "yellow");
 	const inputLabel = formatList("Input", `[${inputString}]`, "reset");
-	const details = `Target: [${target.join(",")}] | Predict: [${discrete.join(",")}]`;
+	
+	const formattedRaw = Array.from(pred, (v) => padTrailingZeros(v, 2)).join(", ");
+	const details = `Target: [${target.join(",")}] | Predict: [${discrete.join(",")}] | Raw: [${formattedRaw}] (${certaintyLabel})`;
 
 	console.log(`${inputLabel} | ${formatStatus(isCorrect)} | ${details}`);
 
@@ -75,15 +82,16 @@ export function evaluate(network, config) {
 			score += verify(network, config.TASK, i.toString(BASE_2).padStart(config.BITS, PAD_CHAR));
 		}
 	} else {
-		const seen = new Set();
-		while (seen.size < count) {
+		const tested = new Set();
+		while (tested.size < count) {
 			const bits = Array.from({ length: config.BITS }, () => (Math.random() > THRESHOLD ? 1 : 0)).join("");
-			if (seen.has(bits)) continue;
-			seen.add(bits);
+			if (tested.has(bits)) continue;
+			tested.add(bits);
 			score += verify(network, config.TASK, bits);
 		}
 	}
 
 	const accuracy = formatPercentage(score / count, 1);
-	console.log(`\nFinal Accuracy: ${paint(`${score} / ${count} (${accuracy})`, score === count ? "green" : "red")}`);
+	const resultColor = score === count ? "green" : "red";
+	console.log(`\nFinal Accuracy: ${paint(`${score} / ${count} (${accuracy})`, resultColor)}`);
 }
