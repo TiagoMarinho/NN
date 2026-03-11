@@ -1,11 +1,9 @@
 import { losses } from "./neural_network.js";
-import { printHeader, paint, formatStatus, formatList } from "./utils/log.js";
+import { printHeader, paint, formatStatus, printRow } from "./utils/log.js";
 import { padTrailingZeros, formatPercentage } from "./utils/formatting.js";
 
 const THRESHOLD = 0.5;
-const CERTAINTY_SCALE = 2;
 const MAX_SAMPLES = 32;
-const BASE_2 = 2;
 const PAD_CHAR = "0";
 
 const calculateVectorLoss = (targets, preds, lossFn) => {
@@ -31,19 +29,19 @@ export function train(network, config) {
 			stats.mse += calculateVectorLoss(target, pred, losses.mse.calculate);
 			stats.bce += calculateVectorLoss(target, pred, losses.bce.calculate);
 
-			network.backward(target);
+			network.backward(target, config.LOSS);
 			if (s % config.BATCH_SIZE === 0) network.optimize(rate, config.BATCH_SIZE);
 		}
 
 		if (epoch % config.LOG_FREQUENCY === 0 || epoch === config.TOTAL_EPOCHS) {
-			const progress = epoch / config.TOTAL_EPOCHS;
-			console.log(
-				`${formatList("Epoch", epoch.toString().padStart(4), "cyan")} (${formatPercentage(progress, 0).padStart(4)}) | ` +
-				`${formatList("MAE", padTrailingZeros(stats.mae / config.SAMPLES_PER_EPOCH, 10), "yellow")} | ` +
-				`${formatList("MSE", padTrailingZeros(stats.mse / config.SAMPLES_PER_EPOCH, 10), "magenta")} | ` +
-				`${formatList("BCE", padTrailingZeros(stats.bce / config.SAMPLES_PER_EPOCH, 10), "green")} | ` +
-				`${formatList("Rate", padTrailingZeros(rate, 4), "reset")}`
-			);
+			const progress = formatPercentage(epoch / config.TOTAL_EPOCHS, 0).padStart(4);
+			printRow([
+				{ label: "Epoch", value: epoch, color: "cyan",    width: 4, suffix: ` (${progress})` },
+				{ label: "MAE",   value: padTrailingZeros(stats.mae / config.SAMPLES_PER_EPOCH, 10), color: "yellow"  },
+				{ label: "MSE",   value: padTrailingZeros(stats.mse / config.SAMPLES_PER_EPOCH, 10), color: "magenta" },
+				{ label: "BCE",   value: padTrailingZeros(stats.bce / config.SAMPLES_PER_EPOCH, 10), color: "green"   },
+				{ label: "Rate",  value: padTrailingZeros(rate, 4),                                  color: "reset"   },
+			]);
 		}
 	}
 }
@@ -52,34 +50,35 @@ const verify = (network, task, inputString) => {
 	const input = inputString.split("").map(Number);
 	const target = task.solve(input);
 	const pred = network.predict(input);
-	
-	const discrete = Array.from(pred, (v) => (v > THRESHOLD ? 1 : 0));
-	const isCorrect = target.every((val, i) => val === discrete[i]);
 
-	const totalConfidence = pred.reduce((acc, val) => acc + Math.abs(val - THRESHOLD) * CERTAINTY_SCALE, 0);
-	const averageConfidence = totalConfidence / pred.length;
+	const isCorrect = task.evaluate(target, pred);
 
-	const certaintyLabel = paint(formatPercentage(averageConfidence, 1), "yellow");
-	const inputLabel = formatList("Input", `[${inputString}]`, "reset");
-	
-	const formattedRaw = Array.from(pred, (v) => padTrailingZeros(v, 2)).join(", ");
-	const details = `Target: [${target.join(",")}] | Predict: [${discrete.join(",")}] | Raw: [${formattedRaw}] (${certaintyLabel})`;
+	const formattedTarget = target.map((v) => padTrailingZeros(v, 6)).join(", ");
+	const formattedPred   = Array.from(pred).map((v) => padTrailingZeros(v, 6)).join(", ");
 
-	console.log(`${inputLabel} | ${formatStatus(isCorrect)} | ${details}`);
+	const meanError = pred.reduce((acc, val, i) => acc + Math.abs(val - target[i]), 0) / pred.length;
+
+	printRow([
+		{ label: "Input",   value: `[${inputString}]`,       color: "reset"  },
+		{ label: "Status",  value: formatStatus(isCorrect),  color: "reset"  },
+		{ label: "Target",  value: `[${formattedTarget}]`,   color: "reset"  },
+		{ label: "Predict", value: `[${formattedPred}]`,     color: "reset"  },
+		{ label: "Error",   value: formatPercentage(meanError, 1), color: "yellow" },
+	]);
 
 	return isCorrect ? 1 : 0;
 };
 
 export function evaluate(network, config) {
 	printHeader("Final Evaluation");
-	const total = Math.pow(BASE_2, config.BITS);
+	const total = Math.pow(2, config.BITS);
 	const isExhaustive = total <= MAX_SAMPLES;
 	const count = isExhaustive ? total : MAX_SAMPLES;
 	let score = 0;
 
 	if (isExhaustive) {
 		for (let i = 0; i < total; i++) {
-			score += verify(network, config.TASK, i.toString(BASE_2).padStart(config.BITS, PAD_CHAR));
+			score += verify(network, config.TASK, i.toString(2).padStart(config.BITS, PAD_CHAR));
 		}
 	} else {
 		const tested = new Set();
