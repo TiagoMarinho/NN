@@ -5,30 +5,21 @@ import {
 	losses,
 	GradientBuffer,
 	Layer,
-	NeuralNetwork
+	NeuralNetwork,
 } from "./neural_network.js";
 
 import {
 	paint,
 	printHeader,
 	formatStatus,
-	formatList
+	printRow,
+	printTable,
 } from "./utils/log.js";
 
-import {
-	padTrailingZeros
-} from "./utils/formatting.js";
+import { padTrailingZeros } from "./utils/formatting.js";
 
 const ERROR_TOLERANCE = 1e-5;
 const LOSS_LOGGING_PRECISION = 6;
-const PROCESS_EXIT_FAILURE = 1;
-const BINARY_RADIX = 2;
-const INITIAL_ACCUMULATOR = 0;
-
-const INDEX_FIRST = 0;
-const INDEX_SECOND = 1;
-const INDEX_THIRD = 2;
-const INDEX_SIXTH = 5;
 
 const createAssertion = (isConditionMet, errorMessage) => {
 	if (!isConditionMet) {
@@ -74,43 +65,38 @@ const testSchedulers = () => {
 
 	const SCHEDULE_STEPS = [
 		{ epoch: STEP_ONE_EPOCH, rate: STEP_ONE_RATE },
-		{ epoch: STEP_TWO_EPOCH, rate: STEP_TWO_RATE }
+		{ epoch: STEP_TWO_EPOCH, rate: STEP_TWO_RATE },
 	];
 
 	assertFloatingPointEqual(
 		schedulers.linear(EPOCH_START, TOTAL_EPOCHS, RATE_HIGH, RATE_LOW),
 		RATE_HIGH,
-		"Linear Start"
+		"Linear Start",
 	);
-
 	assertFloatingPointEqual(
 		schedulers.linear(TOTAL_EPOCHS, TOTAL_EPOCHS, RATE_HIGH, RATE_LOW),
 		RATE_LOW,
-		"Linear End"
+		"Linear End",
 	);
-
 	assertFloatingPointEqual(
 		schedulers.constant(EPOCH_HALF, TOTAL_EPOCHS, RATE_CONSTANT),
 		RATE_CONSTANT,
-		"Constant"
+		"Constant",
 	);
-
 	assertFloatingPointEqual(
 		schedulers.stepped(EPOCH_QUARTER, TOTAL_EPOCHS, SCHEDULE_STEPS),
 		STEP_ONE_RATE,
-		"Stepped Early"
+		"Stepped Early",
 	);
-
 	assertFloatingPointEqual(
 		schedulers.stepped(EPOCH_THREE_QUARTERS, TOTAL_EPOCHS, SCHEDULE_STEPS),
 		STEP_TWO_RATE,
-		"Stepped Late"
+		"Stepped Late",
 	);
-
 	assertFloatingPointEqual(
 		schedulers.cosine(EPOCH_HALF, TOTAL_EPOCHS, RATE_HIGH, RATE_LOW),
 		RATE_COSINE_MID,
-		"Cosine Midpoint"
+		"Cosine Midpoint",
 	);
 };
 
@@ -122,13 +108,32 @@ const testActivations = () => {
 	const SIGMOID_ZERO_OUTPUT = 0.5;
 	const RELU_LEAK_SLOPE = 0.01;
 	const RELU_DERIVATIVE_ACTIVE = 1;
-	const RELU_DERIVATIVE_INACTIVE = 0;
 
-	assertFloatingPointEqual(activations.sigmoid.calculate(INPUT_ZERO), SIGMOID_ZERO_OUTPUT, "Sigmoid Calculate");
-	assertFloatingPointEqual(activations.relu.calculate(INPUT_NEGATIVE), 0, "ReLU Inactive");
-	assertFloatingPointEqual(activations.relu.calculate(INPUT_POSITIVE), INPUT_POSITIVE, "ReLU Active");
-	assertFloatingPointEqual(activations.relu.derivative(INPUT_POSITIVE), RELU_DERIVATIVE_ACTIVE, "ReLU Deriv Active");
-	assertFloatingPointEqual(activations.leakyRelu.calculate(INPUT_NEGATIVE), INPUT_NEGATIVE * RELU_LEAK_SLOPE, "Leaky Calculate");
+	assertFloatingPointEqual(
+		activations.sigmoid.calculate(INPUT_ZERO),
+		SIGMOID_ZERO_OUTPUT,
+		"Sigmoid Calculate",
+	);
+	assertFloatingPointEqual(
+		activations.relu.calculate(INPUT_NEGATIVE),
+		0,
+		"ReLU Inactive",
+	);
+	assertFloatingPointEqual(
+		activations.relu.calculate(INPUT_POSITIVE),
+		INPUT_POSITIVE,
+		"ReLU Active",
+	);
+	assertFloatingPointEqual(
+		activations.relu.derivative(INPUT_POSITIVE),
+		RELU_DERIVATIVE_ACTIVE,
+		"ReLU Deriv Active",
+	);
+	assertFloatingPointEqual(
+		activations.leakyRelu.calculate(INPUT_NEGATIVE),
+		INPUT_NEGATIVE * RELU_LEAK_SLOPE,
+		"Leaky Calculate",
+	);
 };
 
 const testLosses = () => {
@@ -138,9 +143,21 @@ const testLosses = () => {
 	const EXPECTED_BCE = 0.693147;
 	const EXPECTED_MSE_DERIVATIVE = -0.5;
 
-	assertFloatingPointEqual(losses.mse.calculate(TARGET, PREDICTION), EXPECTED_MSE, "MSE Calculate");
-	assertFloatingPointEqual(losses.bce.calculate(TARGET, PREDICTION), EXPECTED_BCE, "BCE Calculate");
-	assertFloatingPointEqual(losses.mse.derivative(TARGET, PREDICTION), EXPECTED_MSE_DERIVATIVE, "MSE Derivative");
+	assertFloatingPointEqual(
+		losses.mse.calculate(TARGET, PREDICTION),
+		EXPECTED_MSE,
+		"MSE Calculate",
+	);
+	assertFloatingPointEqual(
+		losses.bce.calculate(TARGET, PREDICTION),
+		EXPECTED_BCE,
+		"BCE Calculate",
+	);
+	assertFloatingPointEqual(
+		losses.mse.derivative(TARGET, PREDICTION),
+		EXPECTED_MSE_DERIVATIVE,
+		"MSE Derivative",
+	);
 };
 
 const testGradientBuffer = () => {
@@ -153,12 +170,12 @@ const testGradientBuffer = () => {
 	buffer.add(DELTAS, FEATURES);
 
 	assertStrictEqual(buffer.size, 1, "Buffer Size Post-Add");
-	assertFloatingPointEqual(buffer.biasGradients[INDEX_FIRST], 0.1, "Bias Grad 0");
-	assertFloatingPointEqual(buffer.weightGradients[INDEX_SIXTH], 0.6, "Weight Grad 5");
+	assertFloatingPointEqual(buffer.biasGradients[0], 0.1, "Bias Grad 0");
+	assertFloatingPointEqual(buffer.weightGradients[5], 0.6, "Weight Grad 5");
 
 	buffer.reset();
 	assertStrictEqual(buffer.size, 0, "Buffer Size Post-Reset");
-	assertFloatingPointEqual(buffer.biasGradients[INDEX_FIRST], 0, "Bias Cleaned");
+	assertFloatingPointEqual(buffer.biasGradients[0], 0, "Bias Cleaned");
 };
 
 const testLayer = () => {
@@ -197,11 +214,13 @@ const testNeuralNetwork = () => {
 
 const calculateNetworkLoss = (network, dataset) => {
 	const total = dataset.reduce((acc, { input, target }) => {
-		const pred = network.predict(input)[INDEX_FIRST];
-		return acc + losses.mse.calculate(target[INDEX_FIRST], pred);
-	}, INITIAL_ACCUMULATOR);
+		const pred = network.predict(input)[0];
+		return acc + losses.mse.calculate(target[0], pred);
+	}, 0);
 	return total / dataset.length;
 };
+
+const regressionResults = [];
 
 const testTaskRegression = (taskName, taskBuilder) => {
 	const BITS = 4;
@@ -212,8 +231,8 @@ const testTaskRegression = (taskName, taskBuilder) => {
 	const task = taskBuilder(BITS);
 	const network = new NeuralNetwork(BITS, [16], 1);
 
-	const combinations = Array.from({ length: Math.pow(BINARY_RADIX, BITS) }, (_, i) => {
-		const input = i.toString(BINARY_RADIX).padStart(BITS, "0").split("").map(Number);
+	const combinations = Array.from({ length: Math.pow(2, BITS) }, (_, i) => {
+		const input = i.toString(2).padStart(BITS, "0").split("").map(Number);
 		return { input, target: task.solve(input) };
 	});
 
@@ -231,12 +250,12 @@ const testTaskRegression = (taskName, taskBuilder) => {
 	const threshold = initialLoss * IMPROVEMENT_REQUIRED;
 	const hasConverged = finalLoss < threshold;
 
-	console.log(
-		`${formatList("Task", taskName.padEnd(10), "reset")} | ` +
-		`${formatList("Start", padTrailingZeros(initialLoss, LOSS_LOGGING_PRECISION), "yellow")} | ` +
-		`${formatList("End", padTrailingZeros(finalLoss, LOSS_LOGGING_PRECISION), "green")} | ` +
-		`${formatStatus(hasConverged)}`
-	);
+	regressionResults.push({
+		task: taskName,
+		start: padTrailingZeros(initialLoss, LOSS_LOGGING_PRECISION),
+		end: padTrailingZeros(finalLoss, LOSS_LOGGING_PRECISION),
+		status: formatStatus(hasConverged),
+	});
 
 	assertLessThan(finalLoss, threshold, `${taskName} Convergence`);
 };
@@ -248,7 +267,7 @@ const runSuite = (label, action) => {
 	} catch (e) {
 		console.log(`${paint("FAIL", "red")} ${label}`);
 		console.error(paint(e.message, "red"));
-		process.exitCode = PROCESS_EXIT_FAILURE;
+		process.exitCode = 1;
 	}
 };
 
@@ -262,10 +281,24 @@ const startTesting = () => {
 	runSuite("Network Structural", testNeuralNetwork);
 
 	printHeader("Integration Tests: Task Regression");
-	runSuite("Parity Convergence", () => testTaskRegression("Parity", TASKS.parity));
-	runSuite("Majority Convergence", () => testTaskRegression("Majority", TASKS.majority));
+	runSuite("Parity Convergence", () =>
+		testTaskRegression("Parity", TASKS.parity),
+	);
+	runSuite("Majority Convergence", () =>
+		testTaskRegression("Majority", TASKS.majority),
+	);
 	runSuite("XOR Convergence", () => testTaskRegression("XOR", TASKS.xor));
 	runSuite("AND Convergence", () => testTaskRegression("AND", TASKS.and));
+
+	printTable(
+		[
+			{ label: "Task", key: "task", color: "reset", align: "left" },
+			{ label: "Start", key: "start", color: "yellow", align: "right" },
+			{ label: "End", key: "end", color: "green", align: "right" },
+			{ label: "Status", key: "status", color: "reset", align: "left" },
+		],
+		regressionResults,
+	);
 };
 
 startTesting();
