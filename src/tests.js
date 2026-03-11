@@ -1,12 +1,12 @@
+import { TASKS } from "./tasks.js";
 import {
-	TASKS,
 	schedulers,
 	activations,
 	losses,
 	GradientBuffer,
 	Layer,
 	NeuralNetwork
-} from "./main.js";
+} from "./neural_network.js";
 
 import {
 	paint,
