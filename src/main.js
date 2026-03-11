@@ -3,7 +3,7 @@ import { getHeWeightScale, getXavierScale } from "./utils/nn.js";
 import { printHeader, paint, formatStatus, formatList } from "./utils/log.js";
 import { padTrailingZeros, formatPercentage } from "./utils/formatting.js";
 
-const TASKS = {
+export const TASKS = {
 	parity: (bits) => ({
 		name: "Parity",
 		generate: () => {
@@ -49,7 +49,7 @@ const TASKS = {
 	}),
 };
 
-const schedulers = {
+export const schedulers = {
 	cosine: (epoch, total, start, min) => {
 		const progress = epoch / total;
 		return min + (start - min) * 0.5 * (1 + Math.cos(Math.PI * progress));
@@ -69,21 +69,21 @@ const schedulers = {
 	constant: (epoch, total, rate) => rate
 };
 
-const BITS = 16;
+const BITS = 8;
 const CONFIGURATION = {
 	BITS,
 	TASK: TASKS.parity(BITS),
 	HIDDEN_LAYERS: [32, 16, 16],
 	TOTAL_EPOCHS: 1000,
 	SAMPLES_PER_EPOCH: 4000,
-	BATCH_SIZE: 16,
+	BATCH_SIZE: 1,
 	
-	SCHEDULER: (e, t) => schedulers.linear(e, t, 0.1, 0.01),
+	SCHEDULER: (e, t) => schedulers.linear(e, t, 0.01, 0.001),
 
 	LOG_FREQUENCY: 10,
 };
 
-const activations = {
+export const activations = {
 	sigmoid: {
 		calculate: (x) => 1 / (1 + Math.exp(-x)),
 		derivative: (y) => y * (1 - y),
@@ -100,7 +100,7 @@ const activations = {
 	},
 };
 
-const losses = {
+export const losses = {
 	mae: {
 		calculate: (t, p) => Math.abs(t - p),
 		derivative: (t, p) => (t > p ? 1 : -1),
@@ -125,7 +125,7 @@ const losses = {
 	},
 };
 
-class GradientBuffer {
+export class GradientBuffer {
 	constructor(outputSize, inputSize) {
 		this.outputSize = outputSize;
 		this.inputSize = inputSize;
@@ -154,7 +154,7 @@ class GradientBuffer {
 	}
 }
 
-class Layer {
+export class Layer {
 	constructor(inputSize, outputSize, activation) {
 		this.inputSize = inputSize;
 		this.outputSize = outputSize;
@@ -164,19 +164,24 @@ class Layer {
 			activation === activations.sigmoid
 				? getXavierScale(inputSize)
 				: getHeWeightScale(inputSize);
-		this.weights = new Float32Array(outputSize * inputSize).map(
-			() => getRandomFloat(-1, 1) * scale,
-		);
+		this.weights = new Float32Array(outputSize * inputSize);
+		for (let i = 0; i < this.weights.length; i++) {
+			this.weights[i] = getRandomFloat(-1, 1) * scale;
+		}
 		this.biases = new Float32Array(outputSize).fill(0.01);
 
 		this.buffer = new GradientBuffer(outputSize, inputSize);
 		this.inputCache = null;
 		this.outputCache = null;
+
+		this.outputs = new Float32Array(outputSize);
+		this.deltas = new Float32Array(outputSize);
+		this.nextErrors = new Float32Array(inputSize);
 	}
 
 	forward(inputs) {
 		this.inputCache = inputs;
-		const outputs = new Float32Array(this.outputSize);
+		const outputs = this.outputs;
 
 		for (let i = 0; i < this.outputSize; i++) {
 			const offset = i * this.inputSize;
@@ -193,13 +198,14 @@ class Layer {
 	}
 
 	backward(errors) {
-		const deltas = new Float32Array(this.outputSize);
+		const deltas = this.deltas;
 		for (let i = 0; i < this.outputSize; i++) {
 			deltas[i] =
 				errors[i] * this.activation.derivative(this.outputCache[i]);
 		}
 
-		const nextErrors = new Float32Array(this.inputSize).fill(0);
+		const nextErrors = this.nextErrors;
+		nextErrors.fill(0);
 		for (let i = 0; i < this.outputSize; i++) {
 			const offset = i * this.inputSize;
 			const delta = deltas[i];
@@ -213,9 +219,8 @@ class Layer {
 		return nextErrors;
 	}
 
-	update(learningRate, batchSize) {
+	update(step) {
 		if (this.buffer.size === 0) return;
-		const step = learningRate / batchSize;
 	  
 		for (let i = 0; i < this.weights.length; i++) {
 		  this.weights[i] -= step * this.buffer.weightGradients[i];
@@ -227,7 +232,7 @@ class Layer {
 	  }
 }
 
-class NeuralNetwork {
+export class NeuralNetwork {
 	constructor(inputSize, hiddenLayers, outputSize) {
 		const sizes = [inputSize, ...hiddenLayers, outputSize];
 		this.layers = sizes.slice(0, -1).map((size, i) => {
@@ -238,6 +243,7 @@ class NeuralNetwork {
 				isLast ? activations.sigmoid : activations.leakyRelu,
 			);
 		});
+		this.errorBuffer = new Float32Array(outputSize);
 	}
 
 	predict(inputs) {
@@ -249,14 +255,22 @@ class NeuralNetwork {
 
 	backward(targets, lossType = losses.bce) {
 		const outputs = this.layers[this.layers.length - 1].outputCache;
-		let errors = targets.map((t, i) => lossType.derivative(t, outputs[i]));
+		const errors = this.errorBuffer;
+
+		for (let i = 0; i < outputs.length; i++) {
+			errors[i] = lossType.derivative(targets[i], outputs[i]);
+		}
+
+		let current = errors;
+
 		for (let i = this.layers.length - 1; i >= 0; i--) {
-			errors = this.layers[i].backward(errors);
+			current = this.layers[i].backward(current);
 		}
 	}
 
 	optimize(learningRate, batchSize) {
-		this.layers.forEach((layer) => layer.update(learningRate, batchSize));
+		const step = learningRate / batchSize;
+		this.layers.forEach((layer) => layer.update(step));
 	}
 }
 
