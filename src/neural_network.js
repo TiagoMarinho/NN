@@ -23,6 +23,10 @@ export const schedulers = {
 };
 
 export const activations = {
+    linear: {
+        calculate: (x) => x,
+        derivative: (y) => 1,
+    },
 	sigmoid: {
 		calculate: (x) => 1 / (1 + Math.exp(-x)),
 		derivative: (y) => y * (1 - y),
@@ -43,8 +47,8 @@ export const losses = {
 		derivative: (target, pred) => (target > pred ? 1 : -1),
 	},
 	mse: {
-		calculate: (target, pred) => Math.pow(target - pred, 2),
-		derivative: (target, pred) => pred - target,
+		calculate: (target, pred) => (target - pred) ** 2,
+		derivative: (target, pred) => 2 * (pred - target),
 	},
 	bce: {
 		calculate: (target, pred) => {
@@ -150,11 +154,11 @@ export class Layer {
 }
 
 export class NeuralNetwork {
-	constructor(inputSize, hiddenLayers, outputSize) {
+	constructor(inputSize, hiddenLayers, outputSize, outputActivation = activations.sigmoid) {
 		const sizes = [inputSize, ...hiddenLayers, outputSize];
 		this.layers = sizes.slice(0, -1).map((size, i) => {
 			const isOutput = i === sizes.length - 2;
-			return new Layer(size, sizes[i + 1], isOutput ? activations.sigmoid : activations.leakyRelu);
+			return new Layer(size, sizes[i + 1], isOutput ? outputActivation : activations.leakyRelu);
 		});
 		this.errorBuffer = new Float32Array(outputSize);
 	}
