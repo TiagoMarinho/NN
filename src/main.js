@@ -3,7 +3,6 @@ import { TASKS } from "./tasks.js";
 import { train, evaluate } from "./train.js";
 
 const BITS = 8;
-const OUTPUT_SIZE = 1;
 
 const CONFIG = {
 	BITS,
@@ -16,7 +15,7 @@ const CONFIG = {
 	SCHEDULER: (e, t) => schedulers.cosine(e, t, 0.01, 0.001),
 };
 
-const network = new NeuralNetwork(CONFIG.BITS, CONFIG.HIDDEN_LAYERS, OUTPUT_SIZE);
+const network = new NeuralNetwork(CONFIG.BITS, CONFIG.HIDDEN_LAYERS, CONFIG.TASK.outputSize);
 
 train(network, CONFIG);
 evaluate(network, CONFIG);
