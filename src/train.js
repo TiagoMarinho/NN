@@ -30,7 +30,7 @@ export function train(network, config) {
 			stats.bce += calculateVectorLoss(target, pred, losses.bce.calculate);
 
 			network.backward(target, config.LOSS);
-			if (s % config.BATCH_SIZE === 0) network.optimize(rate, config.BATCH_SIZE);
+			if (s % config.BATCH_SIZE === 0) network.optimize(rate);
 		}
 
 		if (epoch % config.LOG_FREQUENCY === 0 || epoch === config.TOTAL_EPOCHS) {

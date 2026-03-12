@@ -23,10 +23,10 @@ export const schedulers = {
 };
 
 export const activations = {
-    linear: {
-        calculate: (x) => x,
-        derivative: (y) => 1,
-    },
+	linear: {
+		calculate: (x) => x,
+		derivative: (y) => 1,
+	},
 	sigmoid: {
 		calculate: (x) => 1 / (1 + Math.exp(-x)),
 		derivative: (y) => y * (1 - y),
@@ -62,6 +62,47 @@ export const losses = {
 	},
 };
 
+export const optimizers = {
+
+	sgd: () => ({
+		initState: () => null,
+		step(weights, biases, weightGrads, biasGrads, batchSize, learningRate, _state) {
+			const s = learningRate / batchSize;
+			for (let i = 0; i < weights.length; i++) weights[i] -= s * weightGrads[i];
+			for (let i = 0; i < biases.length; i++) biases[i] -= s * biasGrads[i];
+		},
+	}),
+
+	adam: ({ beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8 } = {}) => ({
+		initState: (weightSize, biasSize) => ({
+			t:  0,
+			mW: new Float32Array(weightSize), // first moment  (weights)
+			vW: new Float32Array(weightSize), // second moment (weights)
+			mB: new Float32Array(biasSize),   // first moment  (biases)
+			vB: new Float32Array(biasSize),   // second moment (biases)
+		}),
+		step(weights, biases, weightGrads, biasGrads, batchSize, learningRate, state) {
+			state.t++;
+			const correctedLR = learningRate * Math.sqrt(1 - beta2 ** state.t) / (1 - beta1 ** state.t);
+
+			for (let i = 0; i < weights.length; i++) {
+				const g = weightGrads[i] / batchSize;
+				state.mW[i] = beta1 * state.mW[i] + (1 - beta1) * g;
+				state.vW[i] = beta2 * state.vW[i] + (1 - beta2) * g * g;
+				weights[i] -= correctedLR * state.mW[i] / (Math.sqrt(state.vW[i]) + epsilon);
+			}
+
+			for (let i = 0; i < biases.length; i++) {
+				const g = biasGrads[i] / batchSize;
+				state.mB[i] = beta1 * state.mB[i] + (1 - beta1) * g;
+				state.vB[i] = beta2 * state.vB[i] + (1 - beta2) * g * g;
+				biases[i] -= correctedLR * state.mB[i] / (Math.sqrt(state.vB[i]) + epsilon);
+			}
+		},
+	}),
+
+};
+
 export class GradientBuffer {
 	constructor(outputSize, inputSize) {
 		this.outputSize = outputSize;
@@ -91,13 +132,15 @@ export class GradientBuffer {
 }
 
 export class Layer {
-	constructor(inputSize, outputSize, activation) {
+	constructor(inputSize, outputSize, activation, optimizer) {
 		this.inputSize = inputSize;
 		this.outputSize = outputSize;
 		this.activation = activation;
+		this.optimizer = optimizer;
 		this.weights = new Float32Array(outputSize * inputSize);
 		this.biases = new Float32Array(outputSize).fill(INITIAL_BIAS);
 		this.buffer = new GradientBuffer(outputSize, inputSize);
+		this.optimizerState = optimizer.initState(this.weights.length, this.biases.length);
 
 		const scale = activation === activations.sigmoid ? getXavierScale(inputSize) : getHeWeightScale(inputSize);
 		for (let i = 0; i < this.weights.length; i++) {
@@ -141,24 +184,30 @@ export class Layer {
 		return this.nextErrors;
 	}
 
-	update(step) {
+	step(learningRate) {
 		if (this.buffer.size === 0) return;
-		for (let i = 0; i < this.weights.length; i++) {
-			this.weights[i] -= step * this.buffer.weightGradients[i];
-		}
-		for (let i = 0; i < this.biases.length; i++) {
-			this.biases[i] -= step * this.buffer.biasGradients[i];
-		}
+		this.optimizer.step(
+			this.weights, this.biases,
+			this.buffer.weightGradients, this.buffer.biasGradients,
+			this.buffer.size, learningRate,
+			this.optimizerState
+		);
 		this.buffer.reset();
 	}
 }
 
 export class NeuralNetwork {
-	constructor(inputSize, hiddenLayers, outputSize, outputActivation = activations.sigmoid) {
+	constructor(
+		inputSize,
+		hiddenLayers,
+		outputSize,
+		outputActivation = activations.sigmoid,
+		optimizer = optimizers.sgd
+	) {
 		const sizes = [inputSize, ...hiddenLayers, outputSize];
 		this.layers = sizes.slice(0, -1).map((size, i) => {
 			const isOutput = i === sizes.length - 2;
-			return new Layer(size, sizes[i + 1], isOutput ? outputActivation : activations.leakyRelu);
+			return new Layer(size, sizes[i + 1], isOutput ? outputActivation : activations.leakyRelu, optimizer);
 		});
 		this.errorBuffer = new Float32Array(outputSize);
 	}
@@ -178,8 +227,7 @@ export class NeuralNetwork {
 		}
 	}
 
-	optimize(learningRate, batchSize) {
-		const step = learningRate / batchSize;
-		this.layers.forEach((layer) => layer.update(step));
+	optimize(learningRate) {
+		this.layers.forEach((layer) => layer.step(learningRate));
 	}
 }
