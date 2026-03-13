@@ -18,7 +18,7 @@ const resolveConfig = () => {
 };
 
 const fromScratch = (config) => ({
-	network:    new NeuralNetwork(config.BITS, config.HIDDEN_LAYERS, config.TASK.outputSize, config.ACTIVATION, config.OPTIMIZER),
+	network: new NeuralNetwork(config.BITS, config.HIDDEN_LAYERS, config.TASK.outputSize, config.HIDDEN_ACTIVATION, config.OUTPUT_ACTIVATION, config.OPTIMIZER),
 	startEpoch: 1,
 });
 

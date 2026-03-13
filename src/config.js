@@ -13,7 +13,8 @@ export const CONFIG = {
 	LOG_FREQUENCY:      100,
 	SCHEDULER:          (e, t) => schedulers.linear(e, t, 0.001, 0.0001),
 	LOSS:               losses.bce,
-	ACTIVATION:         activations.sigmoid,
+	HIDDEN_ACTIVATION:  activations.leakyRelu,
+	OUTPUT_ACTIVATION:  activations.sigmoid,
 	OPTIMIZER:          optimizers.adam(),
 	CHECKPOINT:         { dir: "./checkpoints", frequency: 100 },
 };

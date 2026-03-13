@@ -26,6 +26,7 @@ const deserializeOptimizerState = (raw) => {
 
 export const toSnapshot = (network, epoch) => ({
 	epoch,
+	hiddenActivationName: network.hiddenActivation.name,
 	outputActivationName: network.outputActivation.name,
 	optimizerName:        network.optimizer.name,
 	optimizerParams:      network.optimizer.params,
@@ -40,7 +41,7 @@ export const toSnapshot = (network, epoch) => ({
 });
 
 export const fromSnapshot = (snapshot) => {
-	const { outputActivationName, optimizerName, optimizerParams, layers } = snapshot;
+	const { hiddenActivationName, outputActivationName, optimizerName, optimizerParams, layers } = snapshot;
 
 	const inputSize    = layers[0].inputSize;
 	const outputSize   = layers[layers.length - 1].outputSize;
@@ -50,6 +51,7 @@ export const fromSnapshot = (snapshot) => {
 		inputSize,
 		hiddenLayers,
 		outputSize,
+		activations[hiddenActivationName],
 		activations[outputActivationName],
 		optimizers[optimizerName](optimizerParams),
 	);

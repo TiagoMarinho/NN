@@ -8,16 +8,19 @@ export class NeuralNetwork {
 		inputSize,
 		hiddenLayers,
 		outputSize,
+		hiddenActivation = activations.leakyRelu,
 		outputActivation = activations.sigmoid,
-		optimizer = optimizers.sgd(),
+		optimizer = optimizers.sgd()
 	) {
+		this.hiddenActivation = hiddenActivation;
 		this.outputActivation = outputActivation;
 		this.optimizer = optimizer;
 
 		const sizes = [inputSize, ...hiddenLayers, outputSize];
 		this.layers = sizes.slice(0, -1).map((size, i) => {
 			const isOutput = i === sizes.length - 2;
-			return new Layer(size, sizes[i + 1], isOutput ? outputActivation : activations.leakyRelu, optimizer);
+			const activation = isOutput ? outputActivation : hiddenActivation
+			return new Layer(size, sizes[i + 1], activation, optimizer);
 		});
 		this.errorBuffer = new Float32Array(outputSize);
 	}
@@ -26,8 +29,8 @@ export class NeuralNetwork {
 		return this.layers.reduce((data, layer) => layer.forward(data), inputs);
 	}
 
-	backward(targets, lossType = losses.bce) {
-		const outputs = this.layers[this.layers.length - 1].outputCache;
+	backward(targets, lossType) {
+		const outputs = this.layers[this.layers.length - 1].outputs;
 		for (let i = 0; i < this.errorBuffer.length; i++) {
 			this.errorBuffer[i] = lossType.derivative(targets[i], outputs[i]);
 		}

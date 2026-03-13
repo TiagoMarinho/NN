@@ -85,7 +85,7 @@ const testNeuralNetwork = () => {
 
 	assertStrictEqual(result.length, 1, "Network Output Size");
 
-	network.backward([1]);
+	network.backward([1], losses.bce);
 	network.optimize(0.1);
 };
 
@@ -113,7 +113,7 @@ const testTaskRegression = (taskName, taskBuilder) => {
 	for (let i = 0; i < EPOCHS; i++) {
 		combinations.forEach(({ input, target }) => {
 			network.predict(input);
-			network.backward(target);
+			network.backward(target, losses.bce);
 			network.optimize(0.1);
 		});
 	}
@@ -136,9 +136,8 @@ const runSuite = (label, action) => {
 		action();
 		console.log(`${paint("PASS", "green")} ${label}`);
 	} catch (e) {
-		console.log(`${paint("FAIL", "red")} ${label}`);
 		console.error(paint(e.message, "red"));
-		process.exitCode = 1;
+		console.error(e.stack);
 	}
 };
 
