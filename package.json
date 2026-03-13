@@ -7,7 +7,7 @@
 	"scripts": {
 		"train": "node src/scripts/train.js",
 		"evaluate": "node src/scripts/evaluate.js --checkpoint",
-		"test": "node src/scripts/test.js"
+		"test": "node src/scripts/tests.js"
 	},
 	"keywords": [],
 	"author": "",
