@@ -49,7 +49,6 @@ export class Layer {
 		}
 
 		this.inputCache = null;
-		this.outputCache = null;
 		this.outputs = new Float32Array(outputSize);
 		this.deltas = new Float32Array(outputSize);
 		this.nextErrors = new Float32Array(inputSize);
@@ -65,13 +64,12 @@ export class Layer {
 			}
 			this.outputs[i] = this.activation.calculate(sum);
 		}
-		this.outputCache = this.outputs;
 		return this.outputs;
 	}
 
 	backward(errors) {
 		for (let i = 0; i < this.outputSize; i++) {
-			this.deltas[i] = errors[i] * this.activation.derivative(this.outputCache[i]);
+			this.deltas[i] = errors[i] * this.activation.derivative(this.outputs[i]);
 		}
 		this.nextErrors.fill(0);
 		for (let i = 0; i < this.outputSize; i++) {
