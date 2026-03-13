@@ -29,7 +29,9 @@ export function train(network, config) {
 			stats.bce += calculateVectorLoss(target, pred, losses.bce.calculate);
 
 			network.backward(target, config.LOSS);
-			if (s % config.BATCH_SIZE === 0) network.optimize(rate);
+			if (s % config.BATCH_SIZE === 0 || 
+				s === config.SAMPLES_PER_EPOCH) 
+				network.optimize(rate);
 		}
 
 		if (config.CHECKPOINT && epoch % config.CHECKPOINT.frequency === 0) {

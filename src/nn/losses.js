@@ -3,7 +3,7 @@ const EPSILON = 1e-7;
 export const losses = {
 	mae: {
 		calculate: (target, pred) => Math.abs(target - pred),
-		derivative: (target, pred) => (target > pred ? 1 : -1),
+		derivative: (target, pred) => (pred > target ? 1 : -1),
 	},
 	mse: {
 		calculate: (target, pred) => (target - pred) ** 2,

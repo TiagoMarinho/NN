@@ -1,6 +1,6 @@
 import { printHeader, paint, formatStatus, printRow } from "../utils/log.js";
 import { padTrailingZeros, formatPercentage } from "../utils/formatting.js";
-import { getRandomBits } from "../utils/math.js";
+import { clamp, getRandomBits } from "../utils/math.js";
 
 const MAX_SAMPLES = 32;
 const PAD_CHAR    = "0";
@@ -32,7 +32,7 @@ const exhaustiveInputs = (bits) =>
 
 const randomInputs = (bits, count) => {
 	const seen = new Set();
-	while (seen.size < count) {
+	while (seen.size < clamp(count, 0, 2 ** bits)) {
 		seen.add(getRandomBits(bits).join(""));
 	}
 	return Array.from(seen);
