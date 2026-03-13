@@ -1,14 +1,15 @@
 {
-  "name": "nn",
-  "version": "1.0.0",
-  "description": "",
-  "main": "src/main.js",
-  "type": "module",
-  "scripts": {
-	"train": "node src/main.js",
-    "test": "node src/tests.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC"
+	"name": "nn",
+	"version": "1.0.0",
+	"description": "",
+	"main": "src/main.js",
+	"type": "module",
+	"scripts": {
+		"train": "node src/scripts/train.js",
+		"evaluate": "node src/scripts/evaluate.js --checkpoint",
+		"test": "node src/scripts/test.js"
+	},
+	"keywords": [],
+	"author": "",
+	"license": "ISC"
 }
