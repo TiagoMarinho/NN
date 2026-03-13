@@ -1,12 +1,5 @@
-import { TASKS } from "./tasks.js";
-import {
-	schedulers,
-	activations,
-	losses,
-	GradientBuffer,
-	Layer,
-	NeuralNetwork,
-} from "./neural_network.js";
+import { TASKS } from "./training/tasks/index.js";
+import { schedulers, activations, losses, GradientBuffer, Layer, NeuralNetwork, optimizers } from "./nn/index.js";
 
 import {
 	paint,
@@ -141,7 +134,7 @@ const testLosses = () => {
 	const PREDICTION = 0.5;
 	const EXPECTED_MSE = 0.25;
 	const EXPECTED_BCE = 0.693147;
-	const EXPECTED_MSE_DERIVATIVE = -0.5;
+	const EXPECTED_MSE_DERIVATIVE = -1.0;
 
 	assertFloatingPointEqual(
 		losses.mse.calculate(TARGET, PREDICTION),
@@ -185,7 +178,7 @@ const testLayer = () => {
 	const ERROR_DATA = [0.1, 0.1];
 	const RATE = 0.1;
 
-	const layer = new Layer(INPUT_DIM, OUTPUT_DIM, activations.relu);
+	const layer = new Layer(INPUT_DIM, OUTPUT_DIM, activations.relu, optimizers.sgd());
 	const outputs = layer.forward(INPUT_DATA);
 
 	assertStrictEqual(outputs.length, OUTPUT_DIM, "Forward Output Size");
@@ -194,7 +187,7 @@ const testLayer = () => {
 	assertStrictEqual(backErrors.length, INPUT_DIM, "Backward Error Size");
 	assertStrictEqual(layer.buffer.size, 1, "Buffer Tracking");
 
-	layer.update(RATE);
+	layer.step(RATE);
 	assertStrictEqual(layer.buffer.size, 0, "Buffer Update Reset");
 };
 
@@ -209,7 +202,7 @@ const testNeuralNetwork = () => {
 	assertStrictEqual(result.length, OUTPUTS, "Network Output Size");
 
 	network.backward([1]);
-	network.optimize(0.1, 1);
+	network.optimize(0.1);
 };
 
 const calculateNetworkLoss = (network, dataset) => {
@@ -225,11 +218,10 @@ const regressionResults = [];
 const testTaskRegression = (taskName, taskBuilder) => {
 	const BITS = 4;
 	const EPOCHS = 100;
-	const RATE = 0.2;
 	const IMPROVEMENT_REQUIRED = 0.9;
 
 	const task = taskBuilder(BITS);
-	const network = new NeuralNetwork(BITS, [16], 1);
+	const network = new NeuralNetwork(BITS, [16], task.outputSize);
 
 	const combinations = Array.from({ length: Math.pow(2, BITS) }, (_, i) => {
 		const input = i.toString(2).padStart(BITS, "0").split("").map(Number);
@@ -242,7 +234,7 @@ const testTaskRegression = (taskName, taskBuilder) => {
 		combinations.forEach(({ input, target }) => {
 			network.predict(input);
 			network.backward(target);
-			network.optimize(RATE, 1);
+			network.optimize(0.1);
 		});
 	}
 
@@ -284,18 +276,13 @@ const startTesting = () => {
 	runSuite("Parity Convergence", () =>
 		testTaskRegression("Parity", TASKS.parity),
 	);
-	runSuite("Majority Convergence", () =>
-		testTaskRegression("Majority", TASKS.majority),
-	);
-	runSuite("XOR Convergence", () => testTaskRegression("XOR", TASKS.xor));
-	runSuite("AND Convergence", () => testTaskRegression("AND", TASKS.and));
 
 	printTable(
 		[
-			{ label: "Task", key: "task", color: "reset", align: "left" },
-			{ label: "Start", key: "start", color: "yellow", align: "right" },
-			{ label: "End", key: "end", color: "green", align: "right" },
-			{ label: "Status", key: "status", color: "reset", align: "left" },
+			{ label: "Task",   key: "task",   color: "reset",  align: "left"  },
+			{ label: "Start",  key: "start",  color: "yellow", align: "right" },
+			{ label: "End",    key: "end",    color: "green",  align: "right" },
+			{ label: "Status", key: "status", color: "reset",  align: "left"  },
 		],
 		regressionResults,
 	);

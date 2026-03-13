@@ -1,6 +1,7 @@
-import { NeuralNetwork, schedulers, losses, activations, optimizers } from "./neural_network.js";
-import { TASKS } from "./tasks.js";
-import { train, evaluate } from "./train.js";
+import { NeuralNetwork, schedulers, losses, activations, optimizers } from "./nn/index.js";
+import { TASKS } from "./training/tasks/index.js";
+import { train } from "./training/train.js";
+import { evaluate } from "./training/evaluate.js";
 
 const BITS = 16;
 const BATCH_SIZE = 4;
