@@ -9,8 +9,11 @@ export class NeuralNetwork {
 		hiddenLayers,
 		outputSize,
 		outputActivation = activations.sigmoid,
-		optimizer = optimizers.sgd()
+		optimizer = optimizers.sgd(),
 	) {
+		this.outputActivation = outputActivation;
+		this.optimizer = optimizer;
+
 		const sizes = [inputSize, ...hiddenLayers, outputSize];
 		this.layers = sizes.slice(0, -1).map((size, i) => {
 			const isOutput = i === sizes.length - 2;

@@ -1,6 +1,8 @@
 export const optimizers = {
 
 	sgd: () => ({
+		name: "sgd",
+		params: {},
 		initState: () => null,
 		step(weights, biases, weightGrads, biasGrads, batchSize, learningRate, _state) {
 			const s = learningRate / batchSize;
@@ -10,12 +12,14 @@ export const optimizers = {
 	}),
 
 	adam: ({ beta1 = 0.9, beta2 = 0.999, epsilon = 1e-8 } = {}) => ({
+		name: "adam",
+		params: { beta1, beta2, epsilon },
 		initState: (weightSize, biasSize) => ({
 			t:  0,
-			mW: new Float32Array(weightSize), // first moment  (weights)
-			vW: new Float32Array(weightSize), // second moment (weights)
-			mB: new Float32Array(biasSize),   // first moment  (biases)
-			vB: new Float32Array(biasSize),   // second moment (biases)
+			mW: new Float32Array(weightSize),
+			vW: new Float32Array(weightSize),
+			mB: new Float32Array(biasSize),
+			vB: new Float32Array(biasSize),
 		}),
 		step(weights, biases, weightGrads, biasGrads, batchSize, learningRate, state) {
 			state.t++;

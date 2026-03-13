@@ -1,6 +1,7 @@
 import { losses } from "../nn/losses.js";
-import { printHeader, paint, printRow } from "../utils/log.js";
+import { printHeader, printRow } from "../utils/log.js";
 import { padTrailingZeros, formatPercentage } from "../utils/formatting.js";
+import { saveCheckpoint } from "./checkpoint.js";
 
 const calculateVectorLoss = (targets, preds, lossFn) => {
 	let total = 0;
@@ -13,7 +14,9 @@ const calculateVectorLoss = (targets, preds, lossFn) => {
 export function train(network, config) {
 	printHeader(`Training: ${config.TASK.name}`);
 
-	for (let epoch = 1; epoch <= config.TOTAL_EPOCHS; epoch++) {
+	const startEpoch = config.START_EPOCH ?? 1;
+
+	for (let epoch = startEpoch; epoch <= config.TOTAL_EPOCHS; epoch++) {
 		const stats = { mae: 0, mse: 0, bce: 0 };
 		const rate = config.SCHEDULER(epoch, config.TOTAL_EPOCHS);
 
@@ -27,6 +30,10 @@ export function train(network, config) {
 
 			network.backward(target, config.LOSS);
 			if (s % config.BATCH_SIZE === 0) network.optimize(rate);
+		}
+
+		if (config.CHECKPOINT && epoch % config.CHECKPOINT.frequency === 0) {
+			saveCheckpoint(network, epoch, config.CHECKPOINT.dir);
 		}
 
 		if (epoch % config.LOG_FREQUENCY === 0 || epoch === config.TOTAL_EPOCHS) {

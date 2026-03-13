@@ -41,15 +41,9 @@ export class Layer {
 		this.weights = new Float32Array(outputSize * inputSize);
 		this.biases = new Float32Array(outputSize).fill(INITIAL_BIAS);
 		this.buffer = new GradientBuffer(outputSize, inputSize);
-		this.optimizerState = optimizer.initState(
-			this.weights.length,
-			this.biases.length,
-		);
+		this.optimizerState = optimizer.initState(this.weights.length, this.biases.length);
 
-		const scale =
-			activation === activations.sigmoid
-				? getXavierScale(inputSize)
-				: getHeWeightScale(inputSize);
+		const scale = activation === activations.sigmoid ? getXavierScale(inputSize) : getHeWeightScale(inputSize);
 		for (let i = 0; i < this.weights.length; i++) {
 			this.weights[i] = getRandomFloat(-1, 1) * scale;
 		}
@@ -77,8 +71,7 @@ export class Layer {
 
 	backward(errors) {
 		for (let i = 0; i < this.outputSize; i++) {
-			this.deltas[i] =
-				errors[i] * this.activation.derivative(this.outputCache[i]);
+			this.deltas[i] = errors[i] * this.activation.derivative(this.outputCache[i]);
 		}
 		this.nextErrors.fill(0);
 		for (let i = 0; i < this.outputSize; i++) {
@@ -95,12 +88,9 @@ export class Layer {
 	step(learningRate) {
 		if (this.buffer.size === 0) return;
 		this.optimizer.step(
-			this.weights,
-			this.biases,
-			this.buffer.weightGradients,
-			this.buffer.biasGradients,
-			this.buffer.size,
-			learningRate,
+			this.weights, this.biases,
+			this.buffer.weightGradients, this.buffer.biasGradients,
+			this.buffer.size, learningRate,
 			this.optimizerState,
 		);
 		this.buffer.reset();
